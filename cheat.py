@@ -1,6 +1,7 @@
 import pymem
 import pymem.process
 import pymem.pattern
+import time as t
 from pynput import keyboard
 # Keyboard event handlers
 def on_press(key):
@@ -112,9 +113,12 @@ def create_car_list(pm,address) -> list[int]:
     return cars
 
 def fly():
+    print("[*] Flying teleport started")
     with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
             listener.join()
+    print("[*] Flying teleport ended")
 def enable_bonuses(pm,process_name,car_addr):
+    print("[*] Bonuses started")
     bonus_addr = pm.read_int(car_addr + 0x190)
     print(hex(bonus_addr))
     try:
@@ -125,6 +129,29 @@ def enable_bonuses(pm,process_name,car_addr):
                 modify_memory(process_name=process_name,target_address=bonus,value_change=99999,data_type='int')
     except:
         print("[!] couldnt enable bonuses")
+def teleport_through_checkpoints(pm,process_name,entity_list,player):
+    print("[*] Checkpoint teleport started")
+    checkpoint_list = []
+    i = 0
+    while i < 0xffc:
+        try:
+            addr = pm.read_int(entity_list + i)
+            if pm.read_int(addr) == 0x64d2a8:
+                print(f"[*] checkpoint found! {hex(addr)}")
+                checkpoint_list.append(addr)
+        except Exception as e:
+            pass
+        i+=0x04
+    t.sleep(2)
+    for i in range(100_000):
+        for checkpoint_addr in checkpoint_list:
+            #print(f"Checkpoint: {hex(checkpoint_addr)}")
+            pm.write_float(player+0x38,pm.read_float(checkpoint_addr+0x38))
+            pm.write_float(player+0x3c,pm.read_float(checkpoint_addr+0x3c))
+            pm.write_float(player+0x40,pm.read_float(checkpoint_addr+0x40))
+    print("[*] Checkpoint teleport ended")
+        
+
 
 def main():
     game_addr = 0x400000
@@ -142,10 +169,16 @@ def main():
     entity_list = pm.read_int(second_pointer + 0xc)
     car_list = create_car_list(pm,entity_list)
     
+    print(f"first_pointer= {hex(first_pointer)}")
+    print(f"second_pointer={hex(second_pointer)}")
+    print(f"entity_list={hex(entity_list)}")
+
+
     with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
             if len(car_list) != 0:
                 player_car = car_list[0]
                 enable_bonuses(pm,target_process_name,player_car)
+                #teleport_through_checkpoints(pm,target_process_name,entity_list,player_car)
                 xpos = player_car + 0x38
                 ypos = player_car + 0x3c
                 zpos = player_car + 0x40
